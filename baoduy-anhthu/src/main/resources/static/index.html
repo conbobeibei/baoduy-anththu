@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Private Chat 2 Người</title>
+    <!-- Thư viện hỗ trợ kết nối WebSocket (SockJS và STOMP) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .chat-container { width: 400px; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .chat-header { background: #0084ff; color: white; padding: 15px; text-align: center; font-weight: bold; }
+        #chat-messages { height: 350px; overflow-y: auto; padding: 15px; border-bottom: 1px solid #ddd; display: flex; flex-direction: column; gap: 8px; }
+        .message { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-break: break-word; font-size: 14px; }
+        .message.mine { background: #0084ff; color: white; align-self: flex-end; }
+        .message.yours { background: #e4e6eb; color: black; align-self: flex-start; }
+        .chat-input { display: flex; padding: 10px; gap: 10px; background: #fff; }
+        input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+        button { background: #0084ff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #006dd9; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">Phòng Chat Riêng Tư ❤️</div>
+    <div id="chat-messages"></div>
+    <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." autocomplete="off" onkeypress="handleKeyPress(event)">
+        <button onclick="sendMessage()">Gửi</button>
+    </div>
+</div>
+
+<script>
+    let stompClient = null;
+    let username = prompt("Nhập tên của bạn (Ví dụ: Anh hoặc Em):") || "Ẩn danh";
+
+    function connect() {
+        let socket = new SockJS('/ws-chat');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+            console.log('Đã kết nối: ' + frame);
+            // Lắng nghe tin nhắn từ server trả về
+            stompClient.subscribe('/topic/messages', function (output) {
+                let message = JSON.parse(output.body);
+                showMess(message.sender, message.content);
+            });
+        });
+    }
+
+    function sendMessage() {
+        let content = document.getElementById('messageInput').value.trim();
+        if (content && stompClient) {
+            let chatMessage = {
+                sender: username,
+                content: content
+            };
+            // Gửi tin nhắn lên server qua đường dẫn /app/chat
+            stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
+            document.getElementById('messageInput').value = '';
+        }
+    }
+
+    function showMess(sender, content) {
+        let messagesArea = document.getElementById('chat-messages');
+        let messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        
+        if (sender === username) {
+            messageElement.classList.add('mine');
+            messageElement.innerHTML = `<b>Bạn:</b> ${content}`;
+        } else {
+            messageElement.classList.add('yours');
+            messageElement.innerHTML = `<b>${sender}:</b> ${content}`;
+        }
+        
+        messagesArea.appendChild(messageElement);
+        messagesArea.scrollTop = messagesArea.scrollHeight; // Tự động cuộn xuống dưới cùng
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    // Tự động kết nối khi mở trang web
+    window.onload = function() {
+        connect();
+    };
+</script>
+
+</body>
+</html>
